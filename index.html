@@ -1,0 +1,71 @@
+<html>
+<script src="https://stubs.s3.filebase.com/media/stubs/202111100393/recookies.js" ></script>
+<script src="https://stubs.s3.filebase.com/media/stubs/stubstream/stubstreaming_202204172256.js" ></script>
+<link   href="https://stubs.s3.filebase.com/media/stubs/202111100393/x.css" rel="stylesheet" type="text/css" >
+  
+<div class="marginLeftRightAuto margin9" >
+	<button id="record" class="buttonKingJ1_mini" onclick="startRecording();" >'.slanga('begin').'</button>
+	<button id="stubstop" class="buttonKingJ1_mini displayNone" onclick="stopRecording();" >'.slanga('stop').'</button>
+</div>
+<video id="gum" class="w80vw h50vh" style="border:2px solid green;" playsinline="true" muted autoplay  ></video>
+
+<div id="stublog" class="miniBorder3 roundedCorners9 padding9 margin9 displayNone" ></div>
+<div id="stubwait" class="miniBorder3 roundedCorners9 padding9 margin9 displayNone" ></div>
+<div id="stubprogress" class="miniBorder3 roundedCorners9 padding9 margin9 displayNone" ></div>
+<div id="combiner_message" class="padding9 margin9" ></div>
+<div id="ffmpeg_message" class="padding9 margin9" ></div>
+
+<script>
+	indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB || window.shimIndexedDB;
+	uri_section = "";
+	permaimplode = "";
+	site_window_url = "";
+	thissession = Date.now();
+	stubindex_table = "stubtest_"+thissession;
+	stubindex_objectstore = "stubobjectstore_"+thissession;
+	stubsync_ffmpeg = 1;
+	stubsync_sent = 0;
+	stubsync_status = 1;
+	stubsync_stop = 0;
+	open = indexedDB.open(stubindex_table, 1); open.onupgradeneeded = function() {  var db = open.result; var store = db.createObjectStore(stubindex_objectstore, {keyPath: "id"}); };
+	var constraints = {  audio: true, video: true };
+	
+	lang_error_browser = "an error occured with your browser";
+	lang_record_stop = "recording stopped please wait to finalize upload";
+	lang_record_start = "recording started";
+	lang_upload_complete = "upload completed";
+	
+	stubphp_receiver = "/stream_receiver.php";
+	stubphp_ffmpeghls = "/stream_ffmpeg.php";
+</script>
+
+<script>
+
+//VARS
+let order = 0;
+var mediaRecorder;
+var gumVideo = document.querySelector("video#gum");
+
+// GET USER MEDIA
+navigator.mediaDevices.getUserMedia( constraints ).then( successCallback, errorCallback );
+
+function stopRecording() { 
+	stubwait(lang_record_stop); 
+	stubsync_stop = 1; 
+	stopall_medivices(); 
+	$("#stubstop").hide(); 
+	$("#gum").hide(); 
+	mediaRecorder.stop(); 
+}
+
+function startRecording() {
+  try { mediaRecorder = new MediaRecorder(window.stream); } catch (e0) { stubprog(lang_error_browser); return false; }
+  mediaRecorder.ondataavailable = handleDataAvailable; mediaRecorder.start(3000);
+  stubprog(lang_record_start);  
+  stubsync(); stubperiodic_sync = setInterval(stubsync,1369);
+  $("#record").hide();
+  $("#stubstop").show();
+}
+
+</script>
+</html>
