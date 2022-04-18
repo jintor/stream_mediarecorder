@@ -1,57 +1,70 @@
-thissession = Date.now();
-let order = 0;
-var mediaRecorder;
-var sourceBuffer;
-var gumVideo = document.querySelector("video#gum");
-var constraints = {  audio: true, video: true };
+function stublog (e) { $("#stublog").show(); $("#stublog").append("<div>"+e+"<div>"); }
+function stubprog (e) { $("#stubprogress").show(); $("#stubprogress").html("<div>"+e+"</div>"); }
+function stubwait (e) { $("#stubwait").show(); $("#stubwait").html("<div>"+e+"</div>"); }
 
-navigator.mediaDevices.getUserMedia( constraints ).then( successCallback, errorCallback );
+function successCallback(stream) { window.stream = stream; gumVideo.srcObject = stream; }
 
-function stublog (e) { $("#stublog").append(e+"<br>"); }
-function stubprog (e) { $("#stuprogress").html(e+"<br>"); }
-stublog ("snowi = "+snowi);
-
-function successCallback(stream) { stublog("stream ok", stream); window.stream = stream; gumVideo.srcObject = stream; }
-function errorCallback(error) { stublog(error); }
-function stopRecording() { mediaRecorder.stop(); }
+function errorCallback(error) { stubprog(error); }
 
 function handleDataAvailable(event) {
 	var reader = new FileReader();
 	reader.readAsArrayBuffer(event.data); 
-	reader.onloadend = async function(event) { let arrayBuffer = reader.result; let uint8View = new Uint8Array(arrayBuffer); stubchunks(uint8View,order); order += 1; }
+	reader.onloadend = async function(event) { 
+		let arrayBuffer = reader.result; 
+		let uint8View = new Uint8Array(arrayBuffer); 
+		stubindex_insert(order,uint8View);
+		order ++; 
+	}
 }
 
-function stubchunks (uint8,uint8_order,uint8_divider = 33369) {
-	
-	// LENGHT OF uint8
-	var uint8_length = uint8.length;
-	var uint8_counter = 0;
-	var uint8_howmany_loops = Math.round(parseInt(uint8.length) / uint8_divider);
-	var uint8_howmany_xloops = parseInt(uint8_howmany_loops) + 1;
-		
-	if ( (uint8_length > 0) && (uint8_length <= uint8_divider) ) { 
-		var combinex = []; combinex["thissession"] = encodeURIComponent(thissession); combinex["uint8_order"] = encodeURIComponent(uint8_order); 
-		combinex["stubslice_uint8"] = uint8; combinex["uint8_length"] = uint8_length; combinex["uint8_divider"] = uint8_divider; 
-		stubajax("combiner","/templates/tests_ubox_slice/streamrtc_deslicer.php?pcache="+thissession,combinex,"append"); 
-	} else {
-		for (var loop = 0; loop <= uint8_howmany_xloops; loop++) {
-			var stubslice = uint8.slice(uint8_counter, (parseInt(uint8_counter) + uint8_divider + 1)); 
-			for (var iter = 0; iter <= uint8_divider; iter++) { uint8_counter ++; }
-			if (stubslice.length > 0) {
-				var combinex = []; combinex["thissession"] = encodeURIComponent(thissession); 
-				combinex["uint8_order"] = encodeURIComponent(uint8_order); combinex["stubslice_uint8"] = stubslice; combinex["stubslice_number"] = loop; 
-				combinex["stubslice_quantity"] = uint8_howmany_loops; combinex["uint8_length"] = uint8_length; combinex["uint8_divider"] = uint8_divider; 
-				// stubajax is there : https://github.com/jintor/stubajax/blob/main/stubajax.js
-        stubajax("combiner","/templates/tests_ubox_slice/streamrtc_deslicer.php?pcache="+thissession,combinex,"append");
+function stubindex_insert (stubid,stubdata) {
+	var open = indexedDB.open(stubindex_table, 1);
+	open.onsuccess = function() {
+		var db = open.result;
+		var tx = db.transaction(stubindex_objectstore, "readwrite");
+		var store = tx.objectStore(stubindex_objectstore);
+		store.put({id: stubid, uint8: stubdata});
+		tx.oncomplete = function() { db.close(); };
+	}
+}
+
+function stubindex_remove (stubid) {
+	var open = indexedDB.open(stubindex_table, 1);
+	open.onsuccess = function() {
+		var db = open.result;
+		var tx = db.transaction(stubindex_objectstore, "readwrite");
+		var store = tx.objectStore(stubindex_objectstore);
+		var stubget = store.delete(stubid);
+	}
+}
+
+function stubindex_get (stubid) {
+	var open = indexedDB.open(stubindex_table, 1);
+	open.onsuccess = function() {
+		var db = open.result;
+		var tx = db.transaction(stubindex_objectstore, "readwrite");
+		var store = tx.objectStore(stubindex_objectstore);
+		var stubget = store.get(stubid);
+		stubget.onsuccess = function() { 
+			if ( stubget.result ) { 
+				stubsync_status = 0; 
+				var combinex = []; combinex["stubslice_session"] = encodeURIComponent(thissession); 
+				combinex["stubslice_uint8"] = stubget.result.uint8.toString(); combinex["stubslice_number"] = stubid;
+				stubajax("combiner",stubphp_receiver,combinex); 
+				if ( (stubsync_sent == 1) && (stubsync_ffmpeg == 1) ) { stubajax("ffmpeg",stubphp_ffmpeghls,combinex); stubsync_ffmpeg = 0;  }
+				stubindex_remove(stubid);
+				stubsync_sent ++;
 			}
+		};
+		var countRequest = store.count(); countRequest.onsuccess = function() { 
+			if ( (stubsync_stop == 1) && (stubsync_sent > 1) && (countRequest.result == 0) ) { 
+				clearInterval(stubperiodic_sync); 
+				stubprog(lang_upload_complete);
+				$("#stubwait").html("");
+				$("#stubwait").hide();
+			} 
 		}
 	}
-	
 }
 
-function startRecording() {
-  try { mediaRecorder = new MediaRecorder(window.stream); } catch (e0) { stublog("Unable to create MediaRecorder with codec"); return false; }
-  mediaRecorder.ondataavailable = handleDataAvailable;
-  mediaRecorder.start(3000);
-  stublog("MediaRecorder started");  
-}
+function stubsync () { if ( stubsync_status == 1 ) { log(Date.now()+" sending "+stubsync_sent); stubindex_get(stubsync_sent); } }
